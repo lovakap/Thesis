@@ -17,7 +17,7 @@ def smooth(y, points):
     return smoothed
 
 
-def radial_mean_with_center(image: np.ndarray, x: int = None, y: int = None,  take_max=True, alpha: int =3) -> np.array:
+def radial_mean_with_center(image: np.ndarray, x: int = None, y: int = None,  take_max=False, alpha: int =3) -> np.array:
     shape = image.shape
     if x is None or y is None:
         if take_max:
@@ -45,6 +45,43 @@ def radial_mean_with_center(image: np.ndarray, x: int = None, y: int = None,  ta
     # return np.cumsum(radial_mean)
     # return smooth(radial_mean, alpha)
     return radial_mean, shifted
+
+
+def get_func(name):
+    if name == 'var':
+        return np.var
+    elif name == 'mean':
+        return np.mean
+    else:
+        raise Exception('No such function')
+
+
+def radial_mean_with_center_top_n(image: np.ndarray, x, y, func) -> np.array:
+    shape = image.shape
+    quad = int(shape[0]/4)
+    mean_radial_mean = []
+    true_shifted = None
+    for i in range(len(x)):
+        # x_i = np.clip(x[i], quad, shape[0] - quad)
+        # y_i = np.clip(y[i], quad, shape[1] - quad)
+        x_i = x[i]
+        y_i = y[i]
+        num_of_radiuses = int(min(shape) / 2)
+        shift_x = np.ceil(shape[0] / 2).astype(np.int) - x_i
+        shift_y = np.ceil(shape[1] / 2).astype(np.int) - y_i
+        shifted = np.roll(image, shift=(shift_x, shift_y), axis=(0, 1))
+        xs, ys = np.ogrid[0:shape[0], 0:shape[1]]
+
+        shifted = shifted - shifted.mean()
+        img_nrm = image - image.mean()
+        # radiuses = np.hypot(xs - shape[0] / 2, ys - shape[1] / 2)
+        radiuses = np.hypot(xs - x_i, ys - y_i)
+        rbin = (num_of_radiuses * radiuses / radiuses.max()).astype(np.int)
+        radial_mean = np.asarray([func(img_nrm[rbin <= i]) for i in np.arange(1, rbin.max() + 1)])
+        mean_radial_mean.append(radial_mean[:2*quad - 1])
+        if i == 0:
+            true_shifted = shifted
+    return np.mean(mean_radial_mean, axis=0), true_shifted
 
 
 def fft_convolve_2d(image: np.ndarray, filter: np.ndarray) -> np.ndarray:
@@ -101,8 +138,8 @@ def linear_kernel(kernel_size: int, circle_cut: bool = False) -> np.array:
     return l
 
 
-def gaussian_kernel(kernel_size: int, circle_cut: bool = False) -> np.array:
-    g = gaussian(kernel_size, kernel_size / 4).reshape(kernel_size, 1)
+def gaussian_kernel(kernel_size: int, circle_cut: bool = False, steepness: float = .25) -> np.array:
+    g = gaussian(kernel_size, kernel_size * steepness).reshape(kernel_size, 1)
     # g = gaussian(kernel_size, kernel_size).reshape(kernel_size, 1)
     g = np.dot(g, g.T)
     if circle_cut:
@@ -148,12 +185,15 @@ def get_glued_image(image_size: int, sub_image_size: int, add_noise: bool = Fals
 
 def get_image_for_testing(image_size: int, sub_image_size: int, add_noise: bool = False,
                           blob_std: float = STD, noise_std: float = STD, blob_mean: float = MEAN,
-                          noise_mean: float = MEAN) -> Tuple[np.array, Tuple[int, int], float]:
+                          noise_mean: float = MEAN, random_choise: bool = True) -> Tuple[np.array, Tuple[int, int], float]:
     image = np.zeros((image_size, image_size))
     # pick random place for a particle in the image
-    rand_x = random.choice(range(image_size - sub_image_size))
-    rand_y = random.choice(range(image_size - sub_image_size))
-
+    if random_choise:
+        rand_x = random.choice(range(image_size - sub_image_size))
+        rand_y = random.choice(range(image_size - sub_image_size))
+    else:
+        rand_x = int(image_size / 4)
+        rand_y = int(image_size / 4)
     rn_val = np.random.normal(blob_mean, blob_std, image.shape)
     cc, rr = disk((rand_x + int(sub_image_size / 2), rand_y + int(sub_image_size / 2)), int(sub_image_size / 2))
     # cc, rr = ellipse(rand_x + int(sub_image_size / 2), rand_y + int(sub_image_size / 2), int(sub_image_size / 4),
@@ -233,6 +273,50 @@ def save_double_plot(particle: np.array, random: np.array, filter_size: int, pat
     # plt.colorbar()
     plt.savefig(path + f'filter_size_{filter_size}.png', edgecolor='none')
     plt.close()
+
+
+def save_double_plot_top_n(particle: np.array, random: np.array, filter_size: int, path, p1, p2,
+                     mark_center: bool = True, particle_count: int = 0):
+    os.makedirs(path, exist_ok=True)
+    fig = plt.figure()
+    fig.suptitle(f'filter size - {filter_size} with top {len(p1[0])} points')
+    ax1 = fig.add_subplot(1, 2, 1)
+    ax1.imshow(particle)
+    if mark_center:
+        for i in range(len(p1[0])):
+            ax1.scatter(p1[1][i], p1[0][i], color='r')
+        # ax1.scatter(x, y, color='red')
+
+    if len(p1) > 0:
+        particle_center_var = np.sum((np.squeeze(p1).T - np.squeeze(p1).mean(axis=1)) ** 2) / len(p1)
+        noise_center_var = np.sum((np.squeeze(p2).T - np.squeeze(p2).mean(axis=1)) ** 2) / len(p2)
+    else:
+        particle_center_var = 0
+        noise_center_var = 0
+
+    ax1.axis('off')
+    ax1.title.set_text(f'Single'
+                       f'\nMean: {float("{:.3f}".format(np.mean(particle)))}'
+                       f'\nSTD: {float("{:.3f}".format(np.std(particle)))}'
+                       f'\nDer Sum: {float("{:.3f}".format(get_der_sum(particle)))}'
+                       f'\n Center Var: {float("{:.3f}".format(particle_center_var))}')
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.imshow(random)
+    if mark_center:
+        if mark_center:
+            for i in range(len(p2[0])):
+                ax2.scatter(p2[1][i], p2[0][i], color='r')
+    ax2.axis('off')
+    ax2.title.set_text(f'Intersect with {particle_count} particles'
+                       f'\nMean: {float("{:.3f}".format(np.mean(random)))}'
+                       f'\nSTD: {float("{:.3f}".format(np.std(random)))}'
+                       f'\nDer Sum: {float("{:.3f}".format(get_der_sum(random)))}'
+                       f'\n Center Var: {float("{:.3f}".format(noise_center_var))}')
+    # plt.colorbar()
+    plt.savefig(path + f'filter_size_{filter_size}.png', edgecolor='none')
+    plt.close()
+
+
 
 
 def save_double_plot_var(particle: np.array, with_var: np.array, filter_size: int, path, snr: float, max_val=False, mark_center: bool = True, x=None, y=None):
@@ -351,6 +435,112 @@ def save_double_radial_mean(particle: np.array, with_var: np.array, filter_size:
     plt.savefig(path + f'radial_mean_{filter_size}.png', edgecolor='none')
     # plt.show()
     plt.close()
+
+
+def save_double_radial_mean_top_n(particle: np.array, with_var: np.array, filtered_particle: np.array,
+                                  filtered_with_var: np.array, filter_size: int, path, p1, p2):
+    """~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ MEAN ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ """
+    rd_means_particle, shifted_particle = radial_mean_with_center_top_n(image=particle, x=p1[0], y=p1[1],
+                                                                        func=get_func('mean'))
+    rd_means_noise, shifted_noise = radial_mean_with_center_top_n(image=with_var, x=p2[0], y=p2[1],
+                                                                  func=get_func('mean'))
+    m1 = min(rd_means_noise.min(), rd_means_particle.min())
+    m2 = max(rd_means_noise.max(), rd_means_particle.max())
+
+    rd_means_particle_filtered, shifted_particle_filtered = radial_mean_with_center_top_n(image=filtered_particle,
+                                                                                          x=p1[0], y=p1[1],
+                                                                                          func=get_func('mean'))
+    rd_means_noise_filtered, shifted_noise_filtered = radial_mean_with_center_top_n(image=filtered_with_var, x=p2[0],
+                                                                                    y=p2[1], func=get_func('mean'))
+    m1_filtered = min(rd_means_noise_filtered.min(), rd_means_particle_filtered.min())
+    m2_filtered = max(rd_means_noise_filtered.max(), rd_means_particle_filtered.max())
+
+    """~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ VAR ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ """
+    rd_var_particle, _ = radial_mean_with_center_top_n(image=particle, x=p1[0], y=p1[1],
+                                                                        func=get_func('var'))
+    rd_var_noise, _ = radial_mean_with_center_top_n(image=with_var, x=p2[0], y=p2[1],
+                                                                  func=get_func('var'))
+    m1_var = min(rd_var_noise.min(), rd_var_particle.min())
+    m2_var = max(rd_var_noise.max(), rd_var_particle.max())
+
+    rd_var_particle_filtered, _ = radial_mean_with_center_top_n(image=filtered_particle,
+                                                                                          x=p1[0], y=p1[1],
+                                                                                          func=get_func('var'))
+    rd_var_noise_filtered, _ = radial_mean_with_center_top_n(image=filtered_with_var, x=p2[0],
+                                                                                    y=p2[1], func=get_func('var'))
+    m1_var_filtered = min(rd_var_noise_filtered.min(), rd_var_particle_filtered.min())
+    m2_var_filtered = max(rd_var_noise_filtered.max(), rd_var_particle_filtered.max())
+
+
+    os.makedirs(path, exist_ok=True)
+    fig = plt.figure(figsize=(8, 8), dpi=80)
+    fig.suptitle(f'filter size - {filter_size}, with mean of top {len(p1[0])} points')
+    ax1 = fig.add_subplot(4, 2, 1)
+    ax1.plot(rd_means_particle)
+    ax1.set_ylim(m1, m2)
+    ax1.set(xticklabels=[])
+    ax1.tick_params(bottom=False)
+    ax1.title.set_text(f'Mean Particle')
+
+    ax2 = fig.add_subplot(4, 2, 2)
+    ax2.plot(rd_means_noise)
+    ax2.set_ylim(m1, m2)
+    ax2.set(xticklabels=[])
+    ax2.tick_params(bottom=False)
+    ax2.title.set_text(f'Mean Noise')
+
+    ax3 = fig.add_subplot(4, 2, 3)
+    ax3.plot(rd_means_particle_filtered)
+    ax3.set_ylim(m1_filtered, m2_filtered)
+    ax3.set(xticklabels=[])
+    ax3.tick_params(bottom=False)
+    ax3.title.set_text(f'Mean Filtered Particle')
+
+    ax4 = fig.add_subplot(4, 2, 4)
+    ax4.plot(rd_means_noise_filtered)
+    ax4.set_ylim(m1_filtered, m2_filtered)
+    ax4.set(xticklabels=[])
+    ax4.tick_params(bottom=False)
+    ax4.title.set_text(f'Mean Filtered Noise')
+
+    ax5 = fig.add_subplot(4, 2, 5)
+    ax5.plot(rd_var_particle)
+    ax5.set_ylim(m1_var, m2_var)
+    ax5.set(xticklabels=[])
+    ax5.tick_params(bottom=False)
+    ax5.title.set_text(f'Var Particle')
+
+    ax6 = fig.add_subplot(4, 2, 6)
+    ax6.plot(rd_var_noise)
+    ax6.set_ylim(m1_var, m2_var)
+    ax6.set(xticklabels=[])
+    ax6.tick_params(bottom=False)
+    ax6.title.set_text(f'Var Noise')
+
+    ax7 = fig.add_subplot(4, 2, 7)
+    ax7.plot(rd_var_particle_filtered)
+    ax7.set_ylim(m1_var_filtered, m2_var_filtered)
+    ax7.title.set_text(f'Var Filtered Particle')
+
+    ax8 = fig.add_subplot(4, 2, 8)
+    ax8.plot(rd_var_noise_filtered)
+    ax8.set_ylim(m1_var_filtered, m2_var_filtered)
+    ax8.title.set_text(f'Var Filtered Noise')
+
+    # ax3 = fig.add_subplot(2, 2, 3)
+    # ax3.imshow(shifted_particle, cmap='gray')
+    # ax3.title.set_text(f'Shifted Particle')
+    #
+    # ax4 = fig.add_subplot(2, 2, 4)
+    # ax4.imshow(shifted_noise, cmap='gray')
+    # ax4.title.set_text(f'Shifted Noise')
+
+    # plt.colorbar()
+    plt.savefig(path + f'radial_mean_{filter_size}.png', edgecolor='none')
+    # plt.show()
+    plt.close()
+
+
 
 
 def save_triple_plot(single_object: np.array, empty: np.array, glued: np.array, filter_size: int,

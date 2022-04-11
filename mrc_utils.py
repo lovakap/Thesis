@@ -37,12 +37,12 @@ MRC_CONFIG = {
     },
     '002': {
         'voltage': 300,
-        'pixel_size': 1.77,
-        'DefocusU': 31719.705078,
-        'DefocusV': 31404.576172,
+        'pixel_size': 1.34,
+        'DefocusU': 80489.34082,
+        'DefocusV': 7853.155762,
         'spherical_aberration': 2.0,
-        'DefocusAngle': -38.037568,
-        'phase_shift': -0.008433,
+        'DefocusAngle': 36.673088,
+        'phase_shift': 1.636686,
         'amplitude_contrast': 0.07
     }
 }
@@ -205,7 +205,8 @@ def apply_ctf_on(mrc: np.ndarray, file_name: str) -> np.ndarray:
 
     h = -np.sin(chi)
     imhat = fft2(mrc)
-    imhat = np.multiply(imhat, np.sign(h))
+    # imhat = np.multiply(imhat, np.sign(h))
+    imhat = np.multiply(imhat, h)
     from scipy.ndimage.fourier import fourier_shift
     # imhat = phase_shift(imhat, mrc_info.get('phase_shift'), mrc_info.get('phase_shift'))
     imhat = fourier_shift(imhat, mrc_info.get('phase_shift'))

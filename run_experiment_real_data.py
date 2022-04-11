@@ -1,6 +1,5 @@
 import pandas as pd
-from Utils import get_image_for_testing, create_result_dir, save_plot, get_der_sum, save_double_plot,\
-    get_patched_var, save_double_plot_var, save_double_radial_mean, plot_image_with_marks
+from Utils import *
 from mrc_utils import read_mrc, get_coordinates, crop_random_particle, crop_random_patch, apply_ctf_on, add_patches, \
     PATCH_SIZE, HALF_PATH_SIZE, apply_patches
 from Implementations.centering_conv_ver_1 import apply_filter, fft_convolve_2d
@@ -10,14 +9,13 @@ import matplotlib.patches as patches
 import numpy as np
 import time
 
-
-# file_path = 'Data/Micrographs/002'
-# file_name = '002'
+top_n = 10
 circle_cut = True
 max_val = False
 file_name = 'Falcon_2012_06_12-14_57_34_0'
 # file_name = 'Falcon_2012_06_12-14_33_35_0'
 # file_name = 'Falcon_2012_06_12-15_07_41_0'
+# file_name = '002'
 file_path = 'Data/mrc_files/' + file_name
 full_micrograph = read_mrc(file_path + '.mrc').T
 full_micrograph = apply_ctf_on(full_micrograph, file_name)
@@ -41,6 +39,10 @@ plt.show()
 
 sub_fold = 'Results/Real_Data/'
 path = create_result_dir(f'{file_name}_{PATCH_SIZE}', sub_fold, create_sub_folder=True)
+
+
+# cropped_patch = np.random.random(cropped_patch.shape)
+# cropped_particle = np.random.random(cropped_patch.shape)
 
 fig, ax = plt.subplots()
 ax.imshow(full_micrograph[max(cropped_particle_center[0] - 4 * PATCH_SIZE, 0): min(cropped_particle_center[0] + 4 * PATCH_SIZE, full_micrograph.shape[0]),
@@ -91,15 +93,28 @@ for f_size in [int(PATCH_SIZE * i) for i in filter_size]:
     # filtered_patch = apply_filter(image=var_patch, filter_size=int(f_size/2), circle_cut=circle_cut)
     # save_double_plot_var(filtered_particle, filtered_patch, filter_size=f_size, path=path, snr=0,
     #                      max_val=max_val, mark_center=True, x=0, y=0)
-    save_double_plot(particle=filtered_particle, random=filtered_patch, filter_size=f_size, path=path, snr=0.0,
-                     max_val=max_val, particle_count=len(cropped_patch_intersection))
+    # save_double_plot(particle=filtered_particle, random=filtered_patch, filter_size=f_size, path=path, snr=0.0,
+    #                  max_val=max_val, particle_count=len(cropped_patch_intersection))
+    # if max_val:
+    #     p1 = np.unravel_index(np.argmax(filtered_particle), filtered_particle.shape)
+    #     p2 = np.unravel_index(np.argmax(filtered_patch), filtered_patch.shape)
+    # else:
+    #     p1 = np.unravel_index(np.argmin(filtered_particle), filtered_particle.shape)
+    #     p2 = np.unravel_index(np.argmin(filtered_patch), filtered_patch.shape)
+    #
+    # save_double_radial_mean(particle=cropped_particle, with_var=cropped_patch,
+    #                         filter_size=f_size, path=path, p1=p1, p2=p2, alpha=3)
+
     if max_val:
-        p1 = np.unravel_index(np.argmax(filtered_particle), filtered_particle.shape)
-        p2 = np.unravel_index(np.argmax(filtered_patch), filtered_patch.shape)
+        p1 = np.unravel_index(np.argsort(filtered_particle.flatten())[-top_n:], filtered_particle.shape)
+        p2 = np.unravel_index(np.argsort(filtered_patch.flatten())[-top_n:], filtered_patch.shape)
     else:
-        p1 = np.unravel_index(np.argmin(filtered_particle), filtered_particle.shape)
-        p2 = np.unravel_index(np.argmin(filtered_patch), filtered_patch.shape)
+        p1 = np.unravel_index(np.argsort(filtered_particle.flatten())[:top_n], filtered_particle.shape)
+        p2 = np.unravel_index(np.argsort(filtered_patch.flatten())[:top_n], filtered_patch.shape)
 
-    save_double_radial_mean(particle=cropped_particle, with_var=cropped_patch,
-                            filter_size=f_size, path=path, p1=p1, p2=p2, alpha=3)
-
+    save_double_plot_top_n(particle=filtered_particle, random=filtered_patch, filter_size=f_size, path=path, p1=p1,
+                           p2=p2, particle_count=len(cropped_patch_intersection))
+    # save_double_radial_mean_top_n(particle=cropped_particle, with_var=cropped_patch, filter_size=f_size, path=path,
+    #                               p1=p1, p2=p2)
+    save_double_radial_mean_top_n(particle=cropped_particle, with_var=cropped_patch, filtered_particle=filtered_particle,
+                                  filtered_with_var=filtered_patch, filter_size=f_size, path=path, p1=p1, p2=p2)

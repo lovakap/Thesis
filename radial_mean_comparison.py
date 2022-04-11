@@ -12,7 +12,7 @@ noise_mean = .0
 noise_std = [.5, 1, 2, 4, 8, 16, 32]
 # noise_std = [16]
 blob_mean = .0
-blob_std = .5
+blob_std = .0
 image_size = 100
 blob_size = 50
 
@@ -21,7 +21,7 @@ add_noise = True
 max_val = False
 mark_center = False
 
-res_dir = 'radial_comparison/'
+res_dir = 'Results/radial_comparison/'
 
 
 exp_num = f'Image_Size_{image_size}_Ratio_{float("{:.3f}".format(blob_size / image_size))}_Mean_{blob_mean}_std_{blob_std}/'

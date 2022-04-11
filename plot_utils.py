@@ -30,8 +30,11 @@ def add_info(patch: np.ndarray, points=None, mean: bool = True, std: bool = True
         info += f'STD: {float("{:.3f}".format(np.std(patch)))}\n'
     if der_sum:
         info += f'Der Sum: {float("{:.3f}".format(get_der_sum(patch)))}\n'
-    if points is not None and len(points) > 0:
-        particle_center_var = np.sum((np.squeeze(points).T - np.squeeze(points).mean(axis=1)) ** 2) / len(points)
+    if points is not None:
+        if len(points[0]) > 1:
+            particle_center_var = np.sum((np.squeeze(points).T - np.squeeze(points).mean(axis=1)) ** 2) / len(points)
+        elif len(points[0]) == 1:
+            particle_center_var = 0.0
         info += f'Center Var: {float("{:.3f}".format(particle_center_var))}'
     return info
 
@@ -51,8 +54,8 @@ def save_patches_with_info(patches : List[np.ndarray], labels: List[str], path, 
 
 
 def save_filtered_patches(patches: List[np.ndarray], labels: List[str], filter_size: int,
-                          points: List[Tuple[List[int], List[int]]], path: str, mark_points: bool = True, info=True,
-                          plot=False):
+                          true_centers: List[Tuple[List[int], List[int]]], points: List[Tuple[List[int], List[int]]],
+                          path: str, mark_points: bool = True, info=True, plot=False):
     os.makedirs(path, exist_ok=True)
     fig = plt.figure()
     fig.suptitle(f'filter size - {filter_size} with top {len(points[0][0])} points')
@@ -63,6 +66,7 @@ def save_filtered_patches(patches: List[np.ndarray], labels: List[str], filter_s
         if mark_points:
             for j in range(len(points[i][0])):
                 ax.scatter(points[i][1][j], points[i][0][j], color='r')
+            ax.scatter(true_centers[i][1], true_centers[i][0], color='purple')
         ax.axis('off')
         if info:
             ax.title.set_text(f'{labels[i]}\n' + add_info(patch, points[i]))
@@ -97,20 +101,38 @@ def save_radial_mean(patches: List[np.ndarray], labels: List[str], filter_size: 
     fig = plt.figure(figsize=(8, 8), dpi=80)
     fig.suptitle(f'filter size - {filter_size}, with mean of top {len(points[0][0])} points')
 
-    for i in range(graph_shape[1]):
-        ax1 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1)
-        ax1.plot(radial_info[labels[i]]['radial_mean'])
-        ax1.set_ylim(mean_range[0], mean_range[1])
-        ax1.set(xticklabels=[])
-        ax1.tick_params(bottom=False)
-        ax1.title.set_text(f'Mean ' + labels[i])
+    # for i in range(graph_shape[1]):
+    #     ax1 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1)
+    #     ax1.plot(radial_info[labels[i]]['radial_mean'])
+    #     ax1.set_ylim(mean_range[0], mean_range[1])
+    #     ax1.set(xticklabels=[])
+    #     ax1.tick_params(bottom=False)
+    #     ax1.title.set_text(f'Mean ' + labels[i])
+    #
+    #     ax2 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1 + graph_shape[1])
+    #     ax2.plot(radial_info[labels[i]]['radial_var'])
+    #     ax2.set_ylim(var_range[0], var_range[1])
+    #     # ax2.set(xticklabels=[])
+    #     # ax2.tick_params(bottom=False)
+    #     ax2.title.set_text(f'Var ' + labels[i])
 
-        ax2 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1 + graph_shape[1])
-        ax2.plot(radial_info[labels[i]]['radial_var'])
-        ax2.set_ylim(var_range[0], var_range[1])
-        # ax2.set(xticklabels=[])
-        # ax2.tick_params(bottom=False)
-        ax2.title.set_text(f'Var ' + labels[i])
+    ax1 = fig.add_subplot(graph_shape[0], 1, 1)
+    for i in range(2):
+        ax1.plot(radial_info[labels[i]]['radial_mean'], label=labels[i])
+    ax1.legend()
+    ax1.set_ylim(mean_range[0], mean_range[1])
+    ax1.set(xticklabels=[])
+    ax1.tick_params(bottom=False)
+    ax1.title.set_text(f'Mean')
+
+    ax2 = fig.add_subplot(graph_shape[0], 1, 2)
+    for i in range(2):
+        ax2.plot(radial_info[labels[i]]['radial_var'], label=labels[i])
+    ax2.legend()
+    ax2.set_ylim(var_range[0], var_range[1])
+    # ax2.set(xticklabels=[])
+    # ax2.tick_params(bottom=False)
+    ax2.title.set_text(f'Var')
 
     plt.savefig(path + f'radial_mean_{filter_size}.png', edgecolor='none')
     plt.close()

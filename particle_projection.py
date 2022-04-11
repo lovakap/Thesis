@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.ndimage.interpolation import rotate
+from scipy.ndimage.measurements import center_of_mass
 
 
 class ProjectionSample:
@@ -20,5 +21,5 @@ class ProjectionSample:
             delta_z = np.max(int((second_rotation.shape[2] - self.shape[2]) / 2), 0)
             second_rotation = second_rotation[delta_x:delta_x + self.shape[0], delta_y:delta_y + self.shape[1],
                               delta_z:delta_z + self.shape[2]]
-
-        return second_rotation.mean(axis=-1)
+        c_of_mass = center_of_mass(second_rotation)
+        return second_rotation.mean(axis=-1), np.round(c_of_mass).astype(np.int)[:-1]
