@@ -77,7 +77,8 @@ def save_filtered_patches(patches: List[np.ndarray], labels: List[str], filter_s
 
 
 def save_radial_mean(patches: List[np.ndarray], labels: List[str], filter_size: int,
-                          points: List[Tuple[List[int], List[int]]], path: str):
+                     points: List[Tuple[List[int], List[int]]], path: str, plot=True, return_vals=False,
+                     noise_mean=None, noise_var=None):
 
     radial_info = {}
     shifted_patches = {}
@@ -95,48 +96,54 @@ def save_radial_mean(patches: List[np.ndarray], labels: List[str], filter_size: 
         radial_info[labels[i]] = {'radial_mean': rd_mean, 'radial_var': rd_var}
         shifted_patches[labels[i]] = {'radial_mean': shifted_by_mean, 'radial_var': shifted_by_var}
 
+    if return_vals:
+        return radial_info
+
     graph_shape = (2, len(radial_info))
+    if plot:
+        os.makedirs(path, exist_ok=True)
+        fig = plt.figure(figsize=(8, 8), dpi=80)
+        fig.suptitle(f'filter size - {filter_size}, with mean of top {len(points[0][0])} points')
 
-    os.makedirs(path, exist_ok=True)
-    fig = plt.figure(figsize=(8, 8), dpi=80)
-    fig.suptitle(f'filter size - {filter_size}, with mean of top {len(points[0][0])} points')
+        # for i in range(graph_shape[1]):
+        #     ax1 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1)
+        #     ax1.plot(radial_info[labels[i]]['radial_mean'])
+        #     ax1.set_ylim(mean_range[0], mean_range[1])
+        #     ax1.set(xticklabels=[])
+        #     ax1.tick_params(bottom=False)
+        #     ax1.title.set_text(f'Mean ' + labels[i])
+        #
+        #     ax2 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1 + graph_shape[1])
+        #     ax2.plot(radial_info[labels[i]]['radial_var'])
+        #     ax2.set_ylim(var_range[0], var_range[1])
+        #     # ax2.set(xticklabels=[])
+        #     # ax2.tick_params(bottom=False)
+        #     ax2.title.set_text(f'Var ' + labels[i])
 
-    # for i in range(graph_shape[1]):
-    #     ax1 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1)
-    #     ax1.plot(radial_info[labels[i]]['radial_mean'])
-    #     ax1.set_ylim(mean_range[0], mean_range[1])
-    #     ax1.set(xticklabels=[])
-    #     ax1.tick_params(bottom=False)
-    #     ax1.title.set_text(f'Mean ' + labels[i])
-    #
-    #     ax2 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1 + graph_shape[1])
-    #     ax2.plot(radial_info[labels[i]]['radial_var'])
-    #     ax2.set_ylim(var_range[0], var_range[1])
-    #     # ax2.set(xticklabels=[])
-    #     # ax2.tick_params(bottom=False)
-    #     ax2.title.set_text(f'Var ' + labels[i])
+        ax1 = fig.add_subplot(graph_shape[0], 1, 1)
+        for i in range(2):
+            ax1.plot(radial_info[labels[i]]['radial_mean'], label=labels[i])
+        if noise_mean is not None:
+            ax1.plot(noise_mean, label='Noise Mean')
+        ax1.legend()
+        ax1.set_ylim(mean_range[0], mean_range[1])
+        ax1.set(xticklabels=[])
+        ax1.tick_params(bottom=False)
+        ax1.title.set_text(f'Mean')
 
-    ax1 = fig.add_subplot(graph_shape[0], 1, 1)
-    for i in range(2):
-        ax1.plot(radial_info[labels[i]]['radial_mean'], label=labels[i])
-    ax1.legend()
-    ax1.set_ylim(mean_range[0], mean_range[1])
-    ax1.set(xticklabels=[])
-    ax1.tick_params(bottom=False)
-    ax1.title.set_text(f'Mean')
+        ax2 = fig.add_subplot(graph_shape[0], 1, 2)
+        for i in range(2):
+            ax2.plot(radial_info[labels[i]]['radial_var'], label=labels[i])
+        if noise_var is not None:
+            ax2.plot(noise_var, label='Noise Var')
+        ax2.legend()
+        ax2.set_ylim(var_range[0], var_range[1])
+        # ax2.set(xticklabels=[])
+        # ax2.tick_params(bottom=False)
+        ax2.title.set_text(f'Var')
 
-    ax2 = fig.add_subplot(graph_shape[0], 1, 2)
-    for i in range(2):
-        ax2.plot(radial_info[labels[i]]['radial_var'], label=labels[i])
-    ax2.legend()
-    ax2.set_ylim(var_range[0], var_range[1])
-    # ax2.set(xticklabels=[])
-    # ax2.tick_params(bottom=False)
-    ax2.title.set_text(f'Var')
-
-    plt.savefig(path + f'radial_mean_{filter_size}.png', edgecolor='none')
-    plt.close()
-
+        plt.savefig(path + f'radial_mean_{filter_size}.png', edgecolor='none')
+        plt.close()
 
 def radial_mean_with_center_top_n(image: np.ndarray, points: Tuple[List[int], List[int]], func_type: str,
                                   allow_edges: bool = True):
@@ -172,3 +179,46 @@ def radial_mean_with_center_top_n(image: np.ndarray, points: Tuple[List[int], Li
         if i == 0:
             true_shifted = shifted
     return np.mean(mean_radial_mean, axis=0), true_shifted
+
+
+def plot_distance_from_mean_noise(real_mean_dist, noise_mean_dist, real_var_dist, noise_var_dist, snr, noise_patches,
+                                  top_n, path, plot=False):
+
+    fig = plt.figure(figsize=(8, 8), dpi=80)
+    fig.suptitle(f'SNR : {float("{:.3f}".format(snr))}, Noise Patches: {noise_patches}')
+    ax1 = fig.add_subplot(2, 1, 1)
+    ax1.plot(real_mean_dist, label='Object')
+    ax1.plot(noise_mean_dist, label='Empty')
+    ax1.title.set_text(f'Mean')
+
+    ax2 = fig.add_subplot(2, 1, 2)
+    ax2.plot(real_var_dist, label='Object')
+    ax2.plot(noise_var_dist, label='Empty')
+    ax2.title.set_text(f'Var')
+    plt.savefig(f'{path}/SNR:{float("{:.3f}".format(snr))}, Noise Patches: {noise_patches}, Top :{top_n} points.png')
+    if plot:
+        plt.show()
+    plt.close()
+
+
+def plot_radial_info_with_ranges(radial_info, noise_means, noise_vars, snr, noise_patches, top_n, path, plot=False):
+
+    fig = plt.figure(figsize=(8, 8), dpi=80)
+    fig.suptitle(f'SNR : {float("{:.3f}".format(snr))}, Noise Patches: {noise_patches}')
+    ax1 = fig.add_subplot(2, 1, 1)
+    ax1.fill_between(np.arange(len(noise_means[0])), np.mean(noise_means, axis=0) - np.std(noise_means, axis=0),
+                     np.mean(noise_means, axis=0) + np.std(noise_means, axis=0), alpha=0.2)
+    ax1.plot(radial_info['Object']['radial_mean'], label='Object')
+    ax1.plot(radial_info['Empty']['radial_mean'], label='Empty')
+    ax1.title.set_text(f'Mean')
+
+    ax2 = fig.add_subplot(2, 1, 2)
+    ax1.fill_between(np.arange(len(noise_vars[0])), np.mean(noise_vars, axis=0) - np.std(noise_vars, axis=0),
+                     np.mean(noise_vars, axis=0) + np.std(noise_vars, axis=0), alpha=0.2)
+    ax2.plot(radial_info['Object']['radial_var'], label='Object')
+    ax2.plot(radial_info['Empty']['radial_var'], label='Empty')
+    ax2.title.set_text(f'Var')
+    plt.savefig(f'{path}/SNR:{float("{:.3f}".format(snr))}, Noise Patches: {noise_patches}, Top :{top_n} points, ranges.png')
+    if plot:
+        plt.show()
+    plt.close()
