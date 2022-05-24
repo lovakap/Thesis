@@ -25,30 +25,30 @@ def add_info(patch: np.ndarray, points=None, mean: bool = True, std: bool = True
              der_sum: bool = True):
     info = ''
     if mean:
-        info += f'Mean: {float("{:.3f}".format(np.mean(patch)))}\n'
+        info += f'Mean: {float("{:.6f}".format(np.mean(patch)))}\n'
     if std:
-        info += f'STD: {float("{:.3f}".format(np.std(patch)))}\n'
+        info += f'STD: {float("{:.6f}".format(np.std(patch)))}\n'
     if der_sum:
-        info += f'Der Sum: {float("{:.3f}".format(get_der_sum(patch)))}\n'
+        info += f'Der Sum: {float("{:.4f}".format(get_der_sum(patch)))}\n'
     if points is not None:
         if len(points[0]) > 1:
             particle_center_var = np.sum((np.squeeze(points).T - np.squeeze(points).mean(axis=1)) ** 2) / len(points)
         elif len(points[0]) == 1:
             particle_center_var = 0.0
-        info += f'Center Var: {float("{:.3f}".format(particle_center_var))}'
+        info += f'Center Var: {float("{:.4f}".format(particle_center_var))}'
     return info
 
 
 def save_patches_with_info(patches : List[np.ndarray], labels: List[str], path, snr, info=True, plot=False):
     fig = plt.figure()
-    fig.suptitle(f'filter size - {0}, SNR - {float("{:.3f}".format(snr))}')
+    fig.suptitle(f'SNR - {float("{:.6f}".format(snr))}')
     for i, patch in enumerate(patches):
         ax = fig.add_subplot(1, len(patches), i+1)
         ax.imshow(patch)
         ax.axis('off')
         if info:
             ax.title.set_text(f'{labels[i]}\n' + add_info(patch))
-    plt.savefig(path + f'original_SNR_{float("{:.3f}".format(snr))}.png', edgecolor='none')
+    plt.savefig(path + f'original_SNR_{float("{:.6f}".format(snr))}.png', edgecolor='none')
     if plot:
         plt.show()
 
@@ -74,7 +74,7 @@ def save_filtered_patches(patches: List[np.ndarray], labels: List[str], filter_s
     plt.savefig(path + f'filter_size_{filter_size}.png', edgecolor='none')
     if plot:
         plt.show()
-
+    plt.close()
 
 def save_radial_mean(patches: List[np.ndarray], labels: List[str], filter_size: int,
                      points: List[Tuple[List[int], List[int]]], path: str, plot=True, return_vals=False,
@@ -219,6 +219,19 @@ def plot_radial_info_with_ranges(radial_info, noise_means, noise_vars, snr, nois
     ax2.plot(radial_info['Empty']['radial_var'], label='Empty')
     ax2.title.set_text(f'Var')
     plt.savefig(f'{path}/SNR:{float("{:.3f}".format(snr))}, Noise Patches: {noise_patches}, Top :{top_n} points, ranges.png')
+    if plot:
+        plt.show()
+    plt.close()
+
+
+def save_graphs(graphs, labels, label, x_range, path, plot=False):
+    fig = plt.figure(figsize=(8, 4), dpi=80)
+    fig.suptitle(label)
+    ax1 = fig.add_subplot(1, 1, 1)
+    for i, g in enumerate(graphs):
+        ax1.plot(x_range, g, label=labels[i])
+    ax1.legend()
+    plt.savefig(path + label + '.png')
     if plot:
         plt.show()
     plt.close()
