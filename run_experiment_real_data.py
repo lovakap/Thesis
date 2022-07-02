@@ -12,10 +12,11 @@ import time
 top_n = 10
 circle_cut = True
 max_val = False
-file_name = 'Falcon_2012_06_12-14_57_34_0'
+star = True
+# file_name = 'Falcon_2012_06_12-14_57_34_0'
 # file_name = 'Falcon_2012_06_12-14_33_35_0'
 # file_name = 'Falcon_2012_06_12-15_07_41_0'
-# file_name = '002'
+file_name = '001'
 file_path = 'Data/mrc_files/' + file_name
 full_micrograph = read_mrc(file_path + '.mrc').T
 full_micrograph = apply_ctf_on(full_micrograph, file_name)
@@ -25,7 +26,7 @@ g = gaussian(kernel_size, 1).reshape(kernel_size, 1)
 g = np.dot(g, g.T)
 full_micrograph = fft_convolve_2d(full_micrograph, g)
 
-coordinates = get_coordinates(file_path + '.coord')
+coordinates = get_coordinates(file_path, star=star)
 cropped_particle, cropped_particle_center, cropped_particle_intersection = crop_random_particle(
     micrograph=full_micrograph, coordinates=coordinates)
 cropped_patch, cropped_patch_center, cropped_patch_intersection = crop_random_patch(micrograph=full_micrograph,
@@ -45,12 +46,12 @@ path = create_result_dir(f'{file_name}_{PATCH_SIZE}', sub_fold, create_sub_folde
 # cropped_particle = np.random.random(cropped_patch.shape)
 
 fig, ax = plt.subplots()
-ax.imshow(full_micrograph[max(cropped_particle_center[0] - 4 * PATCH_SIZE, 0): min(cropped_particle_center[0] + 4 * PATCH_SIZE, full_micrograph.shape[0]),
-           max(cropped_particle_center[1] - 4 * PATCH_SIZE, 0): min(cropped_particle_center[1] + 4 * PATCH_SIZE, full_micrograph.shape[1])], cmap='gray')
+ax.imshow(full_micrograph[max(cropped_particle_center[1] - 4 * PATCH_SIZE, 0): min(cropped_particle_center[1] + 4 * PATCH_SIZE, full_micrograph.shape[0]),
+           max(cropped_particle_center[0] - 4 * PATCH_SIZE, 0): min(cropped_particle_center[0] + 4 * PATCH_SIZE, full_micrograph.shape[1])], cmap='gray')
 ax.title.set_text(
-    f'Patch at [{max(cropped_particle_center[0] - 4 * PATCH_SIZE, 0)} : {min(cropped_particle_center[0] + 4 * PATCH_SIZE, full_micrograph.shape[0])}, {max(cropped_particle_center[1] - 4 * PATCH_SIZE, 0)}: {min(cropped_particle_center[1] + 4 * PATCH_SIZE, full_micrograph.shape[1])}]')
-cord_x = 3 * PATCH_SIZE if cropped_particle_center[0] >= 4 * PATCH_SIZE else (cropped_particle_center[0] - PATCH_SIZE)
-cord_y = 3 * PATCH_SIZE if cropped_particle_center[1] >= 4 * PATCH_SIZE else (cropped_particle_center[1] - PATCH_SIZE)
+    f'Patch at [{max(cropped_particle_center[1] - 4 * PATCH_SIZE, 0)} : {min(cropped_particle_center[1] + 4 * PATCH_SIZE, full_micrograph.shape[0])}, {max(cropped_particle_center[0] - 4 * PATCH_SIZE, 0)}: {min(cropped_particle_center[0] + 4 * PATCH_SIZE, full_micrograph.shape[1])}]')
+cord_x = 4 * PATCH_SIZE if cropped_particle_center[0] >= 4 * PATCH_SIZE else (cropped_particle_center[0] - PATCH_SIZE)
+cord_y = 4 * PATCH_SIZE if cropped_particle_center[1] >= 4 * PATCH_SIZE else (cropped_particle_center[1] - PATCH_SIZE)
 
 ptch = patches.Rectangle((cord_x, cord_y), PATCH_SIZE, PATCH_SIZE, linewidth='.5', edgecolor='r', facecolor='None')
 ax.add_patch(ptch)

@@ -21,6 +21,24 @@ def get_measure_func(name: str):
         raise Exception('No such function')
 
 
+def get_info(patch: np.ndarray, points=None, mean: bool = True, var: bool = False,
+             der_sum: bool = True):
+    info ={}
+    if mean:
+        info['mean'] = np.mean(patch).round(6)
+    if var:
+        info['var'] = np.var(patch).round(6)
+    if der_sum:
+        info['der_sum'] = get_der_sum(patch).round(6)
+    if points is not None:
+        if len(points[0]) > 1:
+            particle_center_var = np.sum((np.squeeze(points).T - np.squeeze(points).mean(axis=1)) ** 2) / len(points)
+        elif len(points[0]) == 1:
+            particle_center_var = 0.0
+        info['center_var'] = np.round(particle_center_var, 6)
+    return info
+
+
 def add_info(patch: np.ndarray, points=None, mean: bool = True, std: bool = True,
              der_sum: bool = True):
     info = ''
@@ -100,50 +118,52 @@ def save_radial_mean(patches: List[np.ndarray], labels: List[str], filter_size: 
         return radial_info
 
     graph_shape = (2, len(radial_info))
+
+    # os.makedirs(path, exist_ok=True)
+    fig = plt.figure(figsize=(8, 8), dpi=80)
+    fig.suptitle(f'filter size - {filter_size}, with mean of top {len(points[0][0])} points')
+
+    # for i in range(graph_shape[1]):
+    #     ax1 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1)
+    #     ax1.plot(radial_info[labels[i]]['radial_mean'])
+    #     ax1.set_ylim(mean_range[0], mean_range[1])
+    #     ax1.set(xticklabels=[])
+    #     ax1.tick_params(bottom=False)
+    #     ax1.title.set_text(f'Mean ' + labels[i])
+    #
+    #     ax2 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1 + graph_shape[1])
+    #     ax2.plot(radial_info[labels[i]]['radial_var'])
+    #     ax2.set_ylim(var_range[0], var_range[1])
+    #     # ax2.set(xticklabels=[])
+    #     # ax2.tick_params(bottom=False)
+    #     ax2.title.set_text(f'Var ' + labels[i])
+
+    ax1 = fig.add_subplot(graph_shape[0], 1, 1)
+    for i in range(2):
+        ax1.plot(radial_info[labels[i]]['radial_mean'], label=labels[i])
+    if noise_mean is not None:
+        ax1.plot(noise_mean, label='Noise Mean')
+    ax1.legend()
+    ax1.set_ylim(mean_range[0], mean_range[1])
+    ax1.set(xticklabels=[])
+    ax1.tick_params(bottom=False)
+    ax1.title.set_text(f'Mean')
+
+    ax2 = fig.add_subplot(graph_shape[0], 1, 2)
+    for i in range(2):
+        ax2.plot(radial_info[labels[i]]['radial_var'], label=labels[i])
+    if noise_var is not None:
+        ax2.plot(noise_var, label='Noise Var')
+    ax2.legend()
+    ax2.set_ylim(var_range[0], var_range[1])
+    # ax2.set(xticklabels=[])
+    # ax2.tick_params(bottom=False)
+    ax2.title.set_text(f'Var')
+
+    plt.savefig(path + f'radial_mean_{filter_size}.png', edgecolor='none')
     if plot:
-        os.makedirs(path, exist_ok=True)
-        fig = plt.figure(figsize=(8, 8), dpi=80)
-        fig.suptitle(f'filter size - {filter_size}, with mean of top {len(points[0][0])} points')
-
-        # for i in range(graph_shape[1]):
-        #     ax1 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1)
-        #     ax1.plot(radial_info[labels[i]]['radial_mean'])
-        #     ax1.set_ylim(mean_range[0], mean_range[1])
-        #     ax1.set(xticklabels=[])
-        #     ax1.tick_params(bottom=False)
-        #     ax1.title.set_text(f'Mean ' + labels[i])
-        #
-        #     ax2 = fig.add_subplot(graph_shape[0], graph_shape[1], i + 1 + graph_shape[1])
-        #     ax2.plot(radial_info[labels[i]]['radial_var'])
-        #     ax2.set_ylim(var_range[0], var_range[1])
-        #     # ax2.set(xticklabels=[])
-        #     # ax2.tick_params(bottom=False)
-        #     ax2.title.set_text(f'Var ' + labels[i])
-
-        ax1 = fig.add_subplot(graph_shape[0], 1, 1)
-        for i in range(2):
-            ax1.plot(radial_info[labels[i]]['radial_mean'], label=labels[i])
-        if noise_mean is not None:
-            ax1.plot(noise_mean, label='Noise Mean')
-        ax1.legend()
-        ax1.set_ylim(mean_range[0], mean_range[1])
-        ax1.set(xticklabels=[])
-        ax1.tick_params(bottom=False)
-        ax1.title.set_text(f'Mean')
-
-        ax2 = fig.add_subplot(graph_shape[0], 1, 2)
-        for i in range(2):
-            ax2.plot(radial_info[labels[i]]['radial_var'], label=labels[i])
-        if noise_var is not None:
-            ax2.plot(noise_var, label='Noise Var')
-        ax2.legend()
-        ax2.set_ylim(var_range[0], var_range[1])
-        # ax2.set(xticklabels=[])
-        # ax2.tick_params(bottom=False)
-        ax2.title.set_text(f'Var')
-
-        plt.savefig(path + f'radial_mean_{filter_size}.png', edgecolor='none')
-        plt.close()
+        plt.show()
+    plt.close()
 
 def radial_mean_with_center_top_n(image: np.ndarray, points: Tuple[List[int], List[int]], func_type: str,
                                   allow_edges: bool = True):
@@ -172,7 +192,8 @@ def radial_mean_with_center_top_n(image: np.ndarray, points: Tuple[List[int], Li
         img_nrm = image - image.mean()
         radiuses = np.hypot(xs - x_i, ys - y_i)
         rbin = (num_of_radiuses * radiuses / radiuses.max()).astype(np.int)
-        radial_mean = np.asarray([func(img_nrm[rbin <= i]) for i in np.arange(1, rbin.max() + 1)])
+        radial_mean = np.asarray([func(img_nrm[rbin <= i]) for i in np.arange(0, rbin.max())])
+        # radial_mean = np.asarray([func(img_nrm[(rbin >= i-2) & (rbin <= i+2)]) for i in np.arange(1, rbin.max() + 1)])
         mean_radial_mean.append(radial_mean[:2 * quad_size - 1])
 
         # Save the shift by the first point
@@ -230,6 +251,19 @@ def save_graphs(graphs, labels, label, x_range, path, plot=False):
     ax1 = fig.add_subplot(1, 1, 1)
     for i, g in enumerate(graphs):
         ax1.plot(x_range, g, label=labels[i])
+    ax1.legend()
+    plt.savefig(path + label + '.png')
+    if plot:
+        plt.show()
+    plt.close()
+
+
+def save_graphs2(graphs, labels, label, x_range, path, plot=False):
+    fig = plt.figure(figsize=(8, 4), dpi=80)
+    fig.suptitle(label)
+    ax1 = fig.add_subplot(1, 1, 1)
+    for i, g in enumerate(graphs):
+        ax1.imshow(g, label=labels[i])
     ax1.legend()
     plt.savefig(path + label + '.png')
     if plot:

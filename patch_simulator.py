@@ -1,3 +1,5 @@
+import random
+from scipy.stats import norm
 import numpy as np
 from skimage.draw import ellipse, disk
 from skimage.transform import resize
@@ -95,6 +97,9 @@ class PatchSimulator:
         return sample, (np.array([approx_x]), np.array([approx_y]))
 
     def apply_noise(self, patch):
-        noise = np.random.normal(self.noise_mean, self.noise_std, patch.shape)
+        # noise = np.random.normal(self.noise_mean, self.noise_std, patch.shape)
+        # noise = np.random.uniform(-self.noise_std, self.noise_std, patch.shape)
+        # noise = random.gauss(self.noise_mean, self.noise_std, patch.shape)
+        noise = norm.rvs(self.noise_mean, self.noise_std, patch.shape)
         snr = np.mean(patch**2) / np.mean(noise**2)
         return patch + noise, snr

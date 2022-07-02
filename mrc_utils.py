@@ -1,8 +1,9 @@
 import mrcfile
 import numpy as np
+import pandas as pd
 import matplotlib.patches as patches
 from pyfftw.interfaces.numpy_fft import fft2, ifft2, rfft2, irfft2, fftshift
-PATCH_SIZE = 100
+PATCH_SIZE = 300
 HALF_PATH_SIZE = int(PATCH_SIZE / 2)
 MRC_CONFIG = {
     'Falcon_2012_06_12-14_57_34_0': {
@@ -43,6 +44,16 @@ MRC_CONFIG = {
         'spherical_aberration': 2.0,
         'DefocusAngle': 36.673088,
         'phase_shift': 1.636686,
+        'amplitude_contrast': 0.07
+    },
+    '001': {
+        'voltage': 300,
+        'pixel_size': 1.34,
+        'DefocusU': 3077.1076171896448,
+        'DefocusV': 3025.6388245645076,
+        'spherical_aberration': 2.0,
+        'DefocusAngle': 1.5658147643586378,
+        'phase_shift': -0.014487,
         'amplitude_contrast': 0.07
     }
 }
@@ -100,12 +111,19 @@ def voltage_to_wavelength(voltage):
     return wave_length
 
 
-def get_coordinates(path):
+def get_coordinates(path, star=True):
     points = []
-    with open(path) as f:
-        for line in f:
-            x, y = line.split()
-            points.append((int(x), int(y)))
+    if star:
+        temp = pd.read_csv(path + '.star')
+        points = []
+        for i in range(7, temp.shape[0]):
+            val = temp.iloc[i][0].split()
+            points.append((int(float(val[0])), int(float(val[1]))))
+    else:
+        with open(path + '.coord') as f:
+            for line in f:
+                x, y = line.split()
+                points.append((int(x), int(y)))
     return points
 
 
@@ -113,8 +131,8 @@ def crop_random_particle(micrograph, coordinates):
     idx = np.random.choice(len(coordinates))
     p = coordinates[idx]
     intersection_particles = contain_particle(p[0], p[1], coordinates)
-    return micrograph[p[0] - HALF_PATH_SIZE: p[0] + HALF_PATH_SIZE, p[1] - HALF_PATH_SIZE: p[1] + HALF_PATH_SIZE]\
-        , p, intersection_particles
+    return micrograph[p[1]: p[1] + PATCH_SIZE, p[0]: p[0] + PATCH_SIZE]\
+        , (p[0] + HALF_PATH_SIZE, p[1] + HALF_PATH_SIZE), intersection_particles
 
 
 def contain_particle(x, y, coordinates):
@@ -139,7 +157,7 @@ def crop_random_patch(micrograph, coordinates):
     y = np.random.randint(0, micrograph.shape[1])
     intersection_particles = contain_particle(x, y, coordinates)
     return micrograph[x - HALF_PATH_SIZE: x + HALF_PATH_SIZE, y - HALF_PATH_SIZE: y + HALF_PATH_SIZE], (x, y)\
-        , intersection_particles
+            , intersection_particles
 
 
 def add_patches(p, intersections):
@@ -209,7 +227,7 @@ def apply_ctf_on(mrc: np.ndarray, file_name: str) -> np.ndarray:
     imhat = np.multiply(imhat, h)
     from scipy.ndimage.fourier import fourier_shift
     # imhat = phase_shift(imhat, mrc_info.get('phase_shift'), mrc_info.get('phase_shift'))
-    imhat = fourier_shift(imhat, mrc_info.get('phase_shift'))
+    # imhat = fourier_shift(imhat, mrc_info.get('phase_shift'))
     new_graph = irfft2(imhat, s=mrc.shape)
 
     return new_graph
